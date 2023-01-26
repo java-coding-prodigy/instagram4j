@@ -15,12 +15,12 @@ archivesBaseName = 'instagram4j'
 version = "${versioning.info.branchType.equals('release') ? versioning.info.display : versioning.info.full}"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_18
+    targetCompatibility = JavaVersion.VERSION_18
 }
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 dependencies {
@@ -37,6 +37,10 @@ dependencies {
     testImplementation 'log4j:log4j:1.2.17'
     testImplementation 'junit:junit:4.12'
     testImplementation 'pl.pragmatists:JUnitParams:1.1.1'
+}
+
+lombok {
+    version = "1.18.24"
 }
 
 task sourcesJar(type: Jar, dependsOn: classes) {
@@ -88,10 +92,6 @@ publishing {
             }
         }
     }
-}
-
-signing {
-    sign publishing.publications.mavenPublish
 }
 
 nexusPublishing {
