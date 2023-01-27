@@ -15,8 +15,8 @@ archivesBaseName = 'instagram4j'
 version = "${versioning.info.branchType.equals('release') ? versioning.info.display : versioning.info.full}"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_18
-    targetCompatibility = JavaVersion.VERSION_18
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
