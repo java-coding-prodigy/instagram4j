@@ -1,7 +1,8 @@
 package com.github.instagram4j.instagram4j.utils;
 
 import java.io.ByteArrayOutputStream;
-import java.net.URLEncoder;
+import java.net.*;
+import java.net.http.HttpClient;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.Charset;
@@ -19,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -37,12 +39,14 @@ public class IGUtils {
             "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final ObjectWriter WRITER = MAPPER.writer();
+
     static {
         MAPPER.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         MAPPER.setSerializationInclusion(Include.NON_NULL);
     }
 
-    private IGUtils() {}
+    private IGUtils() {
+    }
 
     /**
      * The characters from a hex-string
@@ -52,7 +56,7 @@ public class IGUtils {
     /**
      * Digest a string using the given codec and input
      *
-     * @param codec Codec to use
+     * @param codec  Codec to use
      * @param source Source to use
      * @return
      */
@@ -79,7 +83,7 @@ public class IGUtils {
     /**
      * Convert the byte array to a hexadecimal presentation (String)
      *
-     * @param bytes byte array
+     * @param bytes        byte array
      * @param initialCount count (length) of the input
      * @return
      */
@@ -135,7 +139,7 @@ public class IGUtils {
      * Converts an Instagram ID to their shortcode system.
      *
      * @param code The ID to convert. Must be provided as a string if it's larger than the size of
-     *        an integer, which MOST Instagram IDs are!
+     *             an integer, which MOST Instagram IDs are!
      * @return The shortcode.
      */
     public static String toCode(long code) {
@@ -213,8 +217,8 @@ public class IGUtils {
                 Base64.getEncoder().encodeToString(out.toByteArray()));
     }
 
-    public static OkHttpClient.Builder defaultHttpClientBuilder() {
-        return new OkHttpClient.Builder().cookieJar(new SerializableCookieJar());
+    public static HttpClient.Builder defaultHttpClientBuilder() {
+        return HttpClient.newBuilder().cookieHandler(new CookieManager());
     }
 
     public static String randomUuid() {
@@ -239,8 +243,12 @@ public class IGUtils {
     }
 
     public static Optional<String> getCookieValue(CookieJar jar, String key) {
-        return jar.loadForRequest(HttpUrl.get(IGConstants.BASE_API_URL)).stream()
-                .filter(cookie -> cookie.name().equals(key)).map(Cookie::value).findAny();
+        try {
+            return jar.loadForRequest(new URL(IGConstants.BASE_API_URL)).stream()
+                    .filter(cookie -> cookie.name().equals(key)).map(Cookie::value).findAny();
+        } catch (MalformedURLException e) {
+            throw new AssertionError("Base API URL is invalid", e);
+        }
     }
 
     public static String truncate(String s) {

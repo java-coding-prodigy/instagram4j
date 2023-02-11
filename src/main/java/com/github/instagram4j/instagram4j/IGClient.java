@@ -4,12 +4,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.net.CookieHandler;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+
 import com.github.instagram4j.instagram4j.actions.IGClientActions;
 import com.github.instagram4j.instagram4j.exceptions.ExceptionallyHandler;
 import com.github.instagram4j.instagram4j.exceptions.IGLoginException;
@@ -41,6 +43,8 @@ import okhttp3.OkHttpClient;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
 
+import java.net.http.HttpClient;
+
 @Data
 @Slf4j
 public class IGClient implements Serializable {
@@ -49,7 +53,7 @@ public class IGClient implements Serializable {
     private final String $password;
     private transient String encryptionId, encryptionKey, authorization;
     @Accessors(chain = true)
-    private transient OkHttpClient httpClient;
+    private transient HttpClient httpClient;
     private transient String sessionId;
     private transient IGClientActions actions;
     @Accessors(chain = true)
@@ -68,7 +72,7 @@ public class IGClient implements Serializable {
         this(username, password, IGUtils.defaultHttpClientBuilder().build());
     }
 
-    public IGClient(String username, String password, OkHttpClient client) {
+    public IGClient(String username, String password, HttpClient client) {
         this.$username = username;
         this.$password = password;
         this.guid = IGUtils.randomUuid();
@@ -127,7 +131,7 @@ public class IGClient implements Serializable {
     public <T extends IGResponse> CompletableFuture<T> sendRequest(@NonNull IGRequest<T> req) {
         CompletableFuture<Pair<Response, String>> responseFuture = new CompletableFuture<>();
         log.info("Sending request : {}", req.formUrl(this).toString());
-        this.httpClient.newCall(req.formRequest(this)).enqueue(new Callback() {
+        this.httpClient.sendAsync(req.formRequest(this)).enqueue(new Callback() {
 
             @Override
             public void onFailure(Call call, IOException exception) {
@@ -167,7 +171,7 @@ public class IGClient implements Serializable {
     }
 
     public String getCsrfToken() {
-        return IGUtils.getCookieValue(this.getHttpClient().cookieJar(), "csrftoken")
+        return IGUtils.getCookieValue(this.getHttpClient().cookieHandler(), "csrftoken")
                 .orElse("missing");
     }
 
@@ -205,12 +209,12 @@ public class IGClient implements Serializable {
     }
 
     public static IGClient deserialize(File clientFile, File cookieFile,
-            OkHttpClient.Builder clientBuilder) throws ClassNotFoundException, IOException {
+                                       HttpClient.Builder clientBuilder) throws ClassNotFoundException, IOException {
         IGClient client = SerializeUtil.deserialize(clientFile, IGClient.class);
-        CookieJar jar = SerializeUtil.deserialize(cookieFile, SerializableCookieJar.class);
+        CookieHandler handler = SerializeUtil.deserialize(cookieFile, CookieHandler.class);
 
-        client.httpClient = clientBuilder
-                .cookieJar(jar)
+        client.httpClient = clientBuilder.
+                cookieHandler(handler)
                 .build();
 
         return client;
@@ -218,7 +222,7 @@ public class IGClient implements Serializable {
 
     public void serialize(File clientFile, File cookieFile) throws IOException {
         SerializeUtil.serialize(this, clientFile);
-        SerializeUtil.serialize(this.httpClient.cookieJar(), cookieFile);
+        SerializeUtil.serialize(this.httpClient.cookieHandler(), cookieFile);
     }
 
     private Object readResolve() throws ObjectStreamException {
@@ -235,7 +239,7 @@ public class IGClient implements Serializable {
     public static class Builder {
         private String username;
         private String password;
-        private OkHttpClient client;
+        private HttpClient client;
         private IGDevice device = IGAndroidDevice.GOOD_DEVICES[0];
         private LoginHandler onChallenge;
         private LoginHandler onTwoFactor;
