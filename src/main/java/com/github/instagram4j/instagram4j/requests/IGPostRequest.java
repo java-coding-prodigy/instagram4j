@@ -11,6 +11,8 @@ import okhttp3.MediaType;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 
+import java.net.http.HttpRequest;
+
 @Slf4j
 public abstract class IGPostRequest<T extends IGResponse> extends IGRequest<T> {
 
@@ -21,10 +23,11 @@ public abstract class IGPostRequest<T extends IGResponse> extends IGRequest<T> {
     }
 
     @Override
-    public Request formRequest(IGClient client) {
-        Request.Builder req = new Request.Builder().url(this.formUrl(client));
+    public HttpRequest formRequest(IGClient client) {
+        HttpRequest.Builder req = HttpRequest.newBuilder().uri(this.formUri(client));
         this.applyHeaders(client, req);
-        req.post(this.getRequestBody(client));
+        //FIXME
+        req.POST(this.getRequestBody(client));
 
         return req.build();
     }

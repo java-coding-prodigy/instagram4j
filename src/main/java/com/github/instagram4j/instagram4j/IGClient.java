@@ -5,10 +5,17 @@ import java.io.IOException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.net.CookieHandler;
+import java.net.CookieManager;
+import java.net.CookieStore;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -42,6 +49,7 @@ import okhttp3.CookieJar;
 import okhttp3.OkHttpClient;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.jetbrains.annotations.NotNull;
 
 import java.net.http.HttpClient;
 
@@ -129,37 +137,49 @@ public class IGClient implements Serializable {
     }
 
     public <T extends IGResponse> CompletableFuture<T> sendRequest(@NonNull IGRequest<T> req) {
-        CompletableFuture<Pair<Response, String>> responseFuture = new CompletableFuture<>();
-        log.info("Sending request : {}", req.formUrl(this).toString());
-        this.httpClient.sendAsync(req.formRequest(this)).enqueue(new Callback() {
+        String uri = req.formUri(this).toString();
+        log.info("Sending request : {}", uri);
+        return this.httpClient.sendAsync(req.formRequest(this), res -> {
+                    log.info("Response for {} : {}", uri, res.statusCode());
+                    return new HttpResponse.BodySubscriber<T>() {
+                        @Override
+                        public void onSubscribe(Flow.Subscription subscription) {
+                            //TODO
+                        }
 
-            @Override
-            public void onFailure(Call call, IOException exception) {
-                responseFuture.completeExceptionally(exception);
-            }
+                        @Override
+                        public void onNext(List<ByteBuffer> item) {
+                            //TODO
+                        }
 
-            @Override
-            public void onResponse(Call call, Response res) throws IOException {
-                log.info("Response for {} : {}", call.request().url().toString(), res.code());
-                try (ResponseBody body = res.body()) {
-                    responseFuture.complete(new Pair<>(res, body.string()));
-                }
-            }
+                        @Override
+                        public void onError(Throwable throwable) {
+                            exceptionallyHandler.handle(throwable, req.getResponseType());
+                        }
 
-        });
+                        @Override
+                        public void onComplete() {
+                            //TODO
+                        }
 
-        return responseFuture
+                        @Override
+                        public CompletionStage<T> getBody() {
+                            return new CompletableFuture<>();
+                        }
+                    };
+                })
                 .thenApply(res -> {
-                    setFromResponseHeaders(res.getFirst());
+                    setFromResponseHeaders(res);
                     log.info("Response for {} with body (truncated) : {}",
-                            res.getFirst().request().url(),
-                            IGUtils.truncate(res.getSecond()));
+                            res.request().uri(),
+                            IGUtils.truncate(res.body().toString()));
 
                     return req.parseResponse(res);
                 })
                 .exceptionally((tr) -> {
                     return this.exceptionallyHandler.handle(tr, req.getResponseType());
                 });
+
     }
 
     private void setLoggedInState(LoginResponse state) {
@@ -171,16 +191,17 @@ public class IGClient implements Serializable {
     }
 
     public String getCsrfToken() {
-        return IGUtils.getCookieValue(this.getHttpClient().cookieHandler(), "csrftoken")
+        return IGUtils.getCookieValue(IGUtils.getCookieStore(this.getHttpClient()), "csrftoken")
                 .orElse("missing");
     }
 
-    public void setFromResponseHeaders(Response res) {
-        Optional.ofNullable(res.header("ig-set-password-encryption-key-id"))
+    public <T> void setFromResponseHeaders(HttpResponse<T> res) {
+        HttpHeaders headers = res.headers();
+        headers.firstValue("ig-set-password-encryption-key-id")
                 .ifPresent(s -> this.encryptionId = s);
-        Optional.ofNullable(res.header("ig-set-password-encryption-pub-key"))
+        headers.firstValue("ig-set-password-encryption-pub-key")
                 .ifPresent(s -> this.encryptionKey = s);
-        Optional.ofNullable(res.header("ig-set-authorization"))
+        headers.firstValue("ig-set-authorization")
                 .ifPresent(s -> this.authorization = s);
     }
 
@@ -222,7 +243,7 @@ public class IGClient implements Serializable {
 
     public void serialize(File clientFile, File cookieFile) throws IOException {
         SerializeUtil.serialize(this, clientFile);
-        SerializeUtil.serialize(this.httpClient.cookieHandler(), cookieFile);
+        SerializeUtil.serialize(IGUtils.getCookieStore(this.getHttpClient()), cookieFile);
     }
 
     private Object readResolve() throws ObjectStreamException {

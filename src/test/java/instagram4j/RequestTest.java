@@ -9,6 +9,8 @@ import com.github.instagram4j.instagram4j.responses.IGResponse;
 
 import okhttp3.Request;
 
+import java.net.http.HttpRequest;
+
 public class RequestTest {
     private class IGTestRequest extends IGRequest<IGResponse> {
         @Override
@@ -17,7 +19,7 @@ public class RequestTest {
         }
 
         @Override
-        public Request formRequest(IGClient client) {
+        public HttpRequest formRequest(IGClient client) {
             // dummy
             return null;
         }
@@ -33,6 +35,6 @@ public class RequestTest {
     public void testUrlFormation() {
         IGTestRequest test = new IGTestRequest();
         Assert.assertEquals("https://i.instagram.com/api/v1/test/path/",
-                test.formUrl(null).toString());
+                test.formUri(null).toString());
     }
 }

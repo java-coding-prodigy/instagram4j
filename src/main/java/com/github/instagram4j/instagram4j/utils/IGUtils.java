@@ -218,7 +218,7 @@ public class IGUtils {
     }
 
     public static HttpClient.Builder defaultHttpClientBuilder() {
-        return HttpClient.newBuilder().cookieHandler(new CookieManager());
+        return HttpClient.newBuilder().CookieManager(new CookieManager());
     }
 
     public static String randomUuid() {
@@ -242,15 +242,23 @@ public class IGUtils {
         return MAPPER.convertValue(o, type);
     }
 
-    public static Optional<String> getCookieValue(CookieJar jar, String key) {
+    public static Optional<String> getCookieValue(CookieStore cookies, String key) {
         try {
-            return jar.loadForRequest(new URL(IGConstants.BASE_API_URL)).stream()
-                    .filter(cookie -> cookie.name().equals(key)).map(Cookie::value).findAny();
-        } catch (MalformedURLException e) {
+            return cookies.get(new URI(IGConstants.BASE_API_URL)).stream()
+                    .filter(cookie -> cookie.getName().equals(key)).map(HttpCookie::getValue).findAny();
+        } catch (URISyntaxException e) {
             throw new AssertionError("Base API URL is invalid", e);
         }
     }
 
+    public static CookieStore getCookieStore(HttpClient client) {
+        //TODO extract cookie store in a better way
+        return  client.cookieHandler()
+                .filter(CookieManager.class::isInstance)
+                .map(CookieManager.class::cast)
+                .map(CookieManager::getCookieStore)
+                .orElseThrow();
+    }
     public static String truncate(String s) {
         return s != null ? s.substring(0, Math.min(100, s.length())) : s;
     }

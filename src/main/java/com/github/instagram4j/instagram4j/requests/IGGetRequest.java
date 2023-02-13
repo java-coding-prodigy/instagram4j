@@ -5,12 +5,14 @@ import com.github.instagram4j.instagram4j.responses.IGResponse;
 
 import okhttp3.Request;
 
+import java.net.http.HttpRequest;
+
 public abstract class IGGetRequest<T extends IGResponse> extends IGRequest<T> {
 
     @Override
-    public Request formRequest(IGClient client) {
-        Request.Builder req = new Request.Builder()
-                .url(this.formUrl(client));
+    public HttpRequest formRequest(IGClient client) {
+        HttpRequest.Builder req = HttpRequest.newBuilder()
+                .uri(this.formUri(client));
         this.applyHeaders(client, req);
 
         return req.build();

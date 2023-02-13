@@ -1,10 +1,14 @@
 package com.github.instagram4j.instagram4j.requests;
 
 import java.io.IOException;
+import java.net.URI;
 import java.net.URLEncoder;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.instagram4j.instagram4j.IGClient;
 import com.github.instagram4j.instagram4j.IGConstants;
@@ -24,7 +28,7 @@ public abstract class IGRequest<T extends IGResponse> {
 
     public abstract String path();
 
-    public abstract Request formRequest(IGClient client);
+    public abstract HttpRequest formRequest(IGClient client);
 
     public abstract Class<T> getResponseType();
 
@@ -40,8 +44,8 @@ public abstract class IGRequest<T extends IGResponse> {
         return "";
     }
 
-    public HttpUrl formUrl(IGClient client) {
-        return HttpUrl.parse(baseApiUrl() + apiPath() + path() + getQueryString(client));
+    public URI formUri(IGClient client) {
+        return URI.create(baseApiUrl() + apiPath() + path() + getQueryString(client));
     }
 
     public CompletableFuture<T> execute(IGClient client) {
@@ -65,10 +69,10 @@ public abstract class IGRequest<T extends IGResponse> {
     }
 
     @SneakyThrows(IOException.class)
-    public T parseResponse(Pair<Response, String> response) {
-        T igResponse = parseResponse(response.getSecond());
-        igResponse.setStatusCode(response.getFirst().code());
-        if (!response.getFirst().isSuccessful() || (igResponse.getStatus() != null && igResponse.getStatus().equals("fail"))) {
+    public T parseResponse(HttpResponse<T> response) {
+        T igResponse = parseResponse(response.body().toString());
+        igResponse.setStatusCode(response.statusCode());
+        if (response.statusCode() / 100 == 2 || (igResponse.getStatus() != null && igResponse.getStatus().equals("fail"))) {
             throw new IGResponseException(igResponse);
         }
 
@@ -86,32 +90,31 @@ public abstract class IGRequest<T extends IGResponse> {
         return response;
     }
 
-    protected Request.Builder applyHeaders(IGClient client, Request.Builder req) {
-        req.addHeader("Connection", "close");
-        req.addHeader("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
-        req.addHeader("Accept-Language", "en-US");
-        req.addHeader("X-IG-Capabilities", client.getDevice().getCapabilities());
-        req.addHeader("X-IG-App-ID", IGConstants.APP_ID);
-        req.addHeader("User-Agent", client.getDevice().getUserAgent());
-        req.addHeader("X-IG-Connection-Type", "WIFI");
-        req.addHeader("X-Ads-Opt-Out", "0");
-        req.addHeader("X-CM-Bandwidth-KBPS", "-1.000");
-        req.addHeader("X-CM-Latency", "-1.000");
-        req.addHeader("X-IG-App-Locale", "en_US");
-        req.addHeader("X-IG-Device-Locale", "en_US");
-        req.addHeader("X-Pigeon-Session-Id", IGUtils.randomUuid());
-        req.addHeader("X-Pigeon-Rawclienttime", System.currentTimeMillis() + "");
-        req.addHeader("X-IG-Connection-Speed",
-                ThreadLocalRandom.current().nextInt(2000, 4000) + "kbps");
-        req.addHeader("X-IG-Bandwidth-Speed-KBPS", "-1.000");
-        req.addHeader("X-IG-Bandwidth-TotalBytes-B", "0");
-        req.addHeader("X-IG-Bandwidth-TotalTime-MS", "0");
-        req.addHeader("X-IG-Extended-CDN-Thumbnail-Cache-Busting-Value", "1000");
-        req.addHeader("X-IG-Device-ID", client.getGuid());
-        req.addHeader("X-IG-Android-ID", client.getDeviceId());
-        req.addHeader("X-FB-HTTP-engine", "Liger");
+    protected HttpRequest.Builder applyHeaders(IGClient client, HttpRequest.Builder req) {
+        req.header("Connection", "close")
+                .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                .header("Accept-Language", "en-US")
+                .header("X-IG-Capabilities", client.getDevice().getCapabilities())
+                .header("X-IG-App-ID", IGConstants.APP_ID)
+                .header("User-Agent", client.getDevice().getUserAgent())
+                .header("X-IG-Connection-Type", "WIFI")
+                .header("X-Ads-Opt-Out", "0")
+                .header("X-CM-Bandwidth-KBPS", "-1.000")
+                .header("X-CM-Latency", "-1.000")
+                .header("X-IG-App-Locale", "en_US")
+                .header("X-IG-Device-Locale", "en_US")
+                .header("X-Pigeon-Session-Id", IGUtils.randomUuid())
+                .header("X-Pigeon-Rawclienttime", System.currentTimeMillis() + "")
+                .header("X-IG-Connection-Speed", ThreadLocalRandom.current().nextInt(2000, 4000) + "kbps")
+                .header("X-IG-Bandwidth-Speed-KBPS", "-1.000")
+                .header("X-IG-Bandwidth-TotalBytes-B", "0")
+                .header("X-IG-Bandwidth-TotalTime-MS", "0")
+                .header("X-IG-Extended-CDN-Thumbnail-Cache-Busting-Value", "1000")
+                .header("X-IG-Device-ID", client.getGuid())
+                .header("X-IG-Android-ID", client.getDeviceId())
+                .header("X-FB-HTTP-engine", "Liger");
         Optional.ofNullable(client.getAuthorization())
-                .ifPresent(s -> req.addHeader("Authorization", s));
+                .ifPresent(s -> req.header("Authorization", s));
 
         return req;
     }
